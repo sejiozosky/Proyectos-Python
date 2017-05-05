@@ -1,0 +1,113 @@
+import time
+import RPi.GPIO as GPIO
+
+
+# Usamos la referencia BOARD para los pines GPIO
+GPIO.setmode(GPIO.BOARD)
+
+# Definimos los pines que vamos a usar
+GPIO_TRIGGER = 11
+GPIO_ECHO = 13
+GPIO_LED = 15
+
+# Configuramos los pines como entradas y salidas
+GPIO.setup(GPIO_TRIGGER,GPIO.OUT)  # Trigger
+GPIO.setup(GPIO_ECHO,GPIO.IN)      # Echo
+GPIO.setup(GPIO_LED ,GPIO.OUT) #Led
+
+
+# -----------------------
+# Definimos algunas funciones
+# -----------------------
+
+def medida():
+  # Esta funcion mide una distancia
+  GPIO.output(GPIO_TRIGGER, True)
+  time.sleep(0.00001)
+  GPIO.output(GPIO_TRIGGER, False)
+  start = time.time()
+
+  while GPIO.input(GPIO_ECHO)==0:
+    start = time.time()
+
+  while GPIO.input(GPIO_ECHO)==1:
+    stop = time.time()
+
+  elapsed = stop-start
+  distancia = (elapsed * 34300)/2
+
+  return distancia
+
+def media_distancia():
+  # Esta funcion recoge 3 medidas
+  # y devuelve la media de las 3.
+  distancia1=medida()
+  time.sleep(0.1)
+  distancia2=medida()
+  time.sleep(0.1)
+  distancia3=medida()
+  distancia = distancia1 + distancia2 + distancia3
+  distancia = distancia / 3
+  return distancia
+
+
+# -----------------------
+# Programa principal
+# -----------------------
+
+
+print ("Medida con sensor de ultrasonidos")
+
+# Ponemos el Trigger en falso (low)
+GPIO.output(GPIO_TRIGGER, False)
+# Ponemos el Led en falso (low)
+GPIO.output(GPIO_LED, False)
+
+# Metemos el bloque principal en un Try para asi poder
+# comprobar si el usuario presiona Ctrl + C
+# y poder ejecutar una limpieza del GPIO, esto tambien
+# evita el usuario tener que ver muchos mensajes de error
+try:
+  while True: # Este bucle se repite siempre
+
+# Lo primero que hago es medir la distancia
+      distancia = media_distancia()
+# Compruebo si la distancia es menor que 10
+# Si es menor que 10 muestro la distancia por pantalla
+
+      if distancia < 10:
+        distancia = media_distancia() # Medidos la distancia 
+        print ("Distancia: %.1f" % distancia, " - " , "Fecha:", time.strftime("%c")) # Mostramos la distancia por pantalla
+        GPIO.output(GPIO_LED, False)
+        time.sleep(1) # Esperamos 1 segundo
+        distancia = media_distancia()
+        a = 0 # Utilizo la variable a para poder para el proceso mas adelante
+
+# Pregunto si la variable a es igual a 1
+# Si lo es no hago nada y repito el if anterior
+      if a == 1:
+        pass
+# Pero si no es 1 le asigno el valor 0
+# Para poder seguir con el IF siguiente
+      else: 
+        a = 0
+      if distancia > 10 and a == 0: # Si la distancia es mayor que 10cms
+           print ("La distancia es mayor de 10 cms. Alarma activada!!", " - ", "Fecha:", time.strftime("%c")) # Se interrumpe el bucle y se muestra un aviso
+           GPIO.output(GPIO_LED, True)  
+           a = 1 # Pongo la variable en 1 para parar el proceso y que no se repita 
+           distancia = media_distancia() # Seguimos midiento la distancia
+           while distancia < 10: # Pero si la distancia vuelve a ser menor de 10
+             break # Se termina este bucle y volvemos al principio nuevamente
+
+except KeyboardInterrupt: # Si el usuario presiona crtl + C
+
+  # Limpiamos los pines GPIO y salimos del programa
+
+  print ("Apagando LED")
+  time.sleep(1)
+  GPIO.output(GPIO_LED, False)
+  print ("Limpiando GPIO")
+  GPIO.cleanup()
+  print ("GPIO limpio")
+  print ("Saliendo...")
+  time.sleep(1)
